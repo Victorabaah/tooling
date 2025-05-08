@@ -26,10 +26,13 @@ jobs:
           terraform_version: "1.5.0"
 
       - name: 📦 Terraform Init
+        working-directory: ./modules/s3-dynamodb
         run: terraform init
 
       - name: 🔍 Terraform Plan
+        working-directory: ./modules/s3-dynamodb
         run: terraform plan
 
       - name: ✅ Terraform Apply
+        working-directory: ./modules/s3-dynamodb
         run: terraform apply -auto-approve
