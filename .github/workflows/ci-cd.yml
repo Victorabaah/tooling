@@ -46,10 +46,8 @@ jobs:
 
       - name: Terraform init
         working-directory: .
-        run: |
-          terraform init \
-            -backend-config="key=${{ env.TF_ENV }}/terraform.tfstate" \
-            -input=false
+        run: terraform init
+            
 
       - name: Terraform plan
         working-directory: .
@@ -81,10 +79,7 @@ jobs:
 
       - name: Terraform init
         working-directory: .
-        run: |
-          terraform init \
-            -backend-config="key=${{ env.TF_ENV }}/terraform.tfstate" \
-            -input=false
+        run: terraform init
 
       - name: Terraform Apply
         if: ${{ github.event.inputs.action != 'destroy' }}
