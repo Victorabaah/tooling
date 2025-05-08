@@ -1,3 +1,13 @@
+terraform {
+  backend "s3" {
+    key            = "tooling/terraform.state"
+    bucket         = "class38-terraform-backend-bucket-myproject"
+    region         = "us-east-2"
+    dynamodb_table = "terraform-state-locking"
+    encrypt        = true
+  }
+}
+
 resource "aws_s3_bucket" "terraform_state" {
   bucket = var.bucket
 
