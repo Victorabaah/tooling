@@ -1,38 +1,35 @@
-name: Terraform Backend Setup
+name: Bootstrap Terraform Backend
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
-  deploy-backend:
-    name: 🚀 Deploy Terraform Backend Resources
+  bootstrap:
+    name: 🧱 Provision S3 + DynamoDB Backend
     runs-on: ubuntu-latest
-
     env:
-      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: us-east-2
 
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout Repo
         uses: actions/checkout@v3
 
-      - name: 🧰 Set up Terraform
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: "1.5.0"
+          terraform_version: 1.5.0
 
-      - name: 📦 Terraform Init
+      - name: Terraform Init
         working-directory: ./modules/s3-dynamodb
         run: terraform init
 
-      - name: 🔍 Terraform Plan
+      - name: Terraform Apply
         working-directory: ./modules/s3-dynamodb
-        run: terraform plan
-
-      - name: ✅ Terraform Apply
-        working-directory: ./modules/s3-dynamodb
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-ap
