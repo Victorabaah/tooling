@@ -1,4 +1,5 @@
 name: Terraform-AWS-Infra-Deployment
+
 on:
   push:
     branches: [main]
@@ -19,73 +20,84 @@ on:
         required: false
         default: "apply"
 
-concurrency:
-  group: terraform-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
-  plan:
-    name: 🌱 Plan
+  setup:
+    name: 🚀 Setup AWS Resources
     runs-on: ubuntu-latest
-    env:
-      TF_ENV:       ${{ github.event.inputs.environment || 'prod' }}
-      AWS_REGION:   ${{ github.event.inputs.region      || 'us-east-2' }}
-      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - uses: hashicorp/setup-terraform@v2
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ github.event.inputs.region || 'us-east-2' }}
+
+      # Create S3 Bucket if not exists
+      - name: Check and Create S3 Bucket
+        run: |
+          BUCKET_NAME="class38-terraform-backend-bucket"
+          if ! aws s3api head-bucket --bucket $BUCKET_NAME 2>/dev/null; then
+            echo "Bucket does not exist. Creating bucket: $BUCKET_NAME"
+            aws s3api create-bucket --bucket $BUCKET_NAME --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION
+          else
+            echo "Bucket $BUCKET_NAME already exists."
+          fi
+
+      # Create DynamoDB Table if not exists
+      - name: Check and Create DynamoDB Table
+        run: |
+          TABLE_NAME="terraform-lock-table"
+          if ! aws dynamodb describe-table --table-name $TABLE_NAME 2>/dev/null; then
+            echo "DynamoDB table does not exist. Creating table: $TABLE_NAME"
+            aws dynamodb create-table \
+              --table-name $TABLE_NAME \
+              --attribute-definitions AttributeName=LockID,AttributeType=S \
+              --key-schema AttributeName=LockID,KeyType=HASH \
+              --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+          else
+            echo "DynamoDB table $TABLE_NAME already exists."
+          fi
+
+  terraform:
+    name: 🌱 Terraform Plan & Apply
+    runs-on: ubuntu-latest
+    needs: setup
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: "1.5.0"
 
-      - name: Terraform fmt
-        working-directory: .
-        run: terraform fmt -check
+      # Initialize Terraform with backend config
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=class38-terraform-backend-bucket" \
+            -backend-config="key=${{ env.TF_ENV }}/terraform.tfstate" \
+            -backend-config="region=${{ github.event.inputs.region || 'us-east-2' }}" \
+            -backend-config="dynamodb_table=terraform-lock-table" \
+            -input=false
 
-      - name: Terraform init
-        working-directory: .
-        run: terraform init
-            
-
-      - name: Terraform plan
-        working-directory: .
+      # Terraform Plan
+      - name: Terraform Plan
         run: terraform plan -lock=false
 
-  approve:
-    name: 🔒 Await Approval
-    runs-on: ubuntu-latest
-    needs: plan
-    environment: ${{ github.event.inputs.environment || 'prod' }}
-    steps:
-      - run: echo "✅ Please go to the Actions UI and Approve or Reject."
-
-  deploy:
-    name: 🚀 Deploy
-    runs-on: ubuntu-latest
-    needs: approve
-    env:
-      TF_ENV:       ${{ github.event.inputs.environment || 'prod' }}
-      AWS_REGION:   ${{ github.event.inputs.region      || 'us-east-2' }}
-      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: "1.5.0"
-
-      - name: Terraform init
-        working-directory: .
-        run: terraform init
-
+      # Terraform Apply
       - name: Terraform Apply
         if: ${{ github.event.inputs.action != 'destroy' }}
-        working-directory: .
         run: terraform apply -auto-approve
 
+      # Terraform Destroy (if requested)
       - name: Terraform Destroy
         if: ${{ github.event.inputs.action == 'destroy' }}
-        working-directory: .
         run: terraform destroy -auto-approve -lock=false
