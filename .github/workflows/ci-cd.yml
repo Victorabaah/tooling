@@ -1,5 +1,4 @@
 name: Terraform-AWS-Infra-Deployment
-
 on:
   push:
     branches: [main]
