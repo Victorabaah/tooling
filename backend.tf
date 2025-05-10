@@ -1,4 +1,4 @@
-*/
+/*
 terraform {
   required_version = ">=0.12.0"
   backend "s3" {
@@ -8,4 +8,4 @@ terraform {
     dynamodb_table = "terraform-state-locking"
   }
 }
-/*
+*/
