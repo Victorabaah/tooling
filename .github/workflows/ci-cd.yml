@@ -40,7 +40,7 @@ jobs:
       # Create S3 Bucket if not exists
       - name: Check and Create S3 Bucket
         run: |
-          BUCKET_NAME="class38-terraform-backend-bucket"
+          BUCKET_NAME="class38-terraform-backend-bucket01"
           if ! aws s3api head-bucket --bucket $BUCKET_NAME 2>/dev/null; then
             echo "Bucket does not exist. Creating bucket: $BUCKET_NAME"
             aws s3api create-bucket --bucket $BUCKET_NAME --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION
@@ -51,7 +51,7 @@ jobs:
       # Create DynamoDB Table if not exists
       - name: Check and Create DynamoDB Table
         run: |
-          TABLE_NAME="terraform-lock-table"
+          TABLE_NAME="terraform-lock-table01"
           if ! aws dynamodb describe-table --table-name $TABLE_NAME 2>/dev/null; then
             echo "DynamoDB table does not exist. Creating table: $TABLE_NAME"
             aws dynamodb create-table \
